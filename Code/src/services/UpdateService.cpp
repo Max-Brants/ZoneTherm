@@ -26,6 +26,11 @@ const char* TAG = "UpdateService";
 const char* kUserAgent = "OpenThermController/" FW_VERSION " (esp-idf)";
 
 constexpr int kHttpTimeoutMs = 20000;
+// GitHub bounces asset downloads to a signed release-assets.githubusercontent.com
+// URL whose path and query run to ~900 bytes. esp_http_client formats the whole
+// request line into its TX buffer and fails with "Out of buffer" if it does not
+// fit, so the 512-byte default is far too small for the download requests.
+constexpr int kHttpBufferSize = 2048;
 constexpr const char* kFirmwareAsset = "firmware.bin";
 constexpr const char* kFilesystemAsset = "littlefs.bin";
 
@@ -400,6 +405,8 @@ bool UpdateService::installFirmware(const std::string& url, std::string& errorOu
     http.crt_bundle_attach = esp_crt_bundle_attach;
     http.user_agent = kUserAgent;
     http.keep_alive_enable = true;
+    http.buffer_size = kHttpBufferSize;
+    http.buffer_size_tx = kHttpBufferSize;
 
     esp_https_ota_config_t otaCfg = {};
     otaCfg.http_config = &http;
@@ -460,6 +467,8 @@ bool UpdateService::installFilesystem(const std::string& url, std::string& error
     cfg.crt_bundle_attach = esp_crt_bundle_attach;
     cfg.user_agent = kUserAgent;
     cfg.keep_alive_enable = true;
+    cfg.buffer_size = kHttpBufferSize;
+    cfg.buffer_size_tx = kHttpBufferSize;
 
     esp_http_client_handle_t client = esp_http_client_init(&cfg);
     if (!client) {
@@ -467,15 +476,37 @@ bool UpdateService::installFilesystem(const std::string& url, std::string& error
         return false;
     }
 
-    esp_err_t err = esp_http_client_open(client, 0);
-    if (err != ESP_OK) {
-        errorOut = std::string("connect failed: ") + esp_err_to_name(err);
-        esp_http_client_cleanup(client);
-        return false;
+    // esp_http_client only chases redirects inside esp_http_client_perform();
+    // on the open/read path used here they have to be followed by hand, and the
+    // asset URL always redirects to a signed githubusercontent.com host.
+    constexpr int kMaxRedirects = 5;
+    int64_t contentLen = 0;
+    int status = 0;
+    for (int hop = 0;; hop++) {
+        const esp_err_t open = esp_http_client_open(client, 0);
+        if (open != ESP_OK) {
+            errorOut = std::string("connect failed: ") + esp_err_to_name(open);
+            esp_http_client_cleanup(client);
+            return false;
+        }
+        contentLen = esp_http_client_fetch_headers(client);
+        status = esp_http_client_get_status_code(client);
+        if (status != 301 && status != 302 && status != 307 && status != 308) break;
+
+        // set_redirection reads the Location the client stashed while parsing,
+        // and closes the socket itself when the redirect crosses hosts.
+        if (hop >= kMaxRedirects ||
+            esp_http_client_set_redirection(client) != ESP_OK) {
+            errorOut = hop >= kMaxRedirects ? "too many redirects"
+                                            : "redirect without a Location header";
+            esp_http_client_close(client);
+            esp_http_client_cleanup(client);
+            return false;
+        }
+        esp_http_client_close(client);
     }
 
-    const int64_t contentLen = esp_http_client_fetch_headers(client);
-    const int status = esp_http_client_get_status_code(client);
+    esp_err_t err = ESP_OK;
     if (status != 200) {
         // 404 simply means this release ships firmware only.
         errorOut = "HTTP " + std::to_string(status);

@@ -26,5 +26,9 @@ def build_webui(source, target, env):
         sys.exit("webui_build: npm run build failed")
 
 
-env.AddPreAction("buildfs", build_webui)
-env.AddPreAction("uploadfs", build_webui)
+# Hook the image file, not the buildfs/uploadfs aliases: SCons runs an alias's
+# actions after the nodes it depends on are already built, so hooking the alias
+# packed data/ *before* vite wrote to it - one build stale locally, and empty in
+# CI where data/ is gitignored and starts out absent. uploadfs depends on the
+# same node, so this covers both targets.
+env.AddPreAction("$BUILD_DIR/littlefs.bin", build_webui)
