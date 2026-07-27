@@ -1,0 +1,30 @@
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
+
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+
+CONFIG_FREERTOS_HZ=1000
+
+# app_main is the control loop and also runs WiFi/Ethernet bring-up from
+# NetworkManager::tick(); esp_wifi_init/start overflow the 3584-byte default.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+
+CONFIG_ETH_ENABLED=y
+CONFIG_ETH_USE_SPI_ETHERNET=y
+CONFIG_ETH_SPI_ETHERNET_W5500=y
+
+CONFIG_LWIP_SNTP_MAX_SERVERS=2
+
+# Unattended updates (UpdateService): an OTA-flashed image boots in
+# PENDING_VERIFY and is reverted by the bootloader unless it confirms itself.
+# UpdateService::tick() only confirms once the network is up, so a release that
+# cannot get online rolls back instead of stranding the controller.
+# NOTE: the revert itself lives in the bootloader, so this only takes effect
+# after one serial flash - it cannot be delivered over the air.
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+
+# Root CAs for https://github.com and objects.githubusercontent.com. On by
+# default in IDF, pinned here because the updater cannot work without it.
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL=y

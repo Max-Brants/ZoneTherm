@@ -1,0 +1,11 @@
+﻿Code/.vscode
+
+# KiCad writes temp DRC/ERC reports next to the project.
+pcb/tmp*.rpt
+
+# KiCad auto-backup archives and editor backups. Kept locally, not published:
+# they are timestamped snapshots of the same design the tracked project files
+# already describe, and they dominated the repo size.
+pcb/*-backups/
+pcb/production/backups/
+*.kicad_sch-bak

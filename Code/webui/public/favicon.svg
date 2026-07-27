@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Mirrors .brand-mark in src/style.css: accent gradient tile + thermometer. -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5b63f0"/>
+      <stop offset="1" stop-color="#9b30e0"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="10" fill="url(#g)"/>
+  <!-- Filled *and* stroked so the stem stays legible at 16px. -->
+  <path d="M14 14.76V3.5a2 2 0 0 0-4 0v11.26a4 4 0 1 0 4 0Z"
+        transform="translate(6.4 6.4) scale(0.8)"
+        fill="#fff" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>
+</svg>

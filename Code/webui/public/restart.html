@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Restarting / ZoneTherm</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="centered restart">
+  <a class="brand utility-brand" href="/">
+    <span class="brand-mark"><svg class="icon" viewBox="0 0 24 24"><path d="M14 14.76V3.5a2 2 0 0 0-4 0v11.26a4 4 0 1 0 4 0Z"/><line x1="12" y1="7" x2="12" y2="13"/></svg></span>
+    ZoneTherm
+  </a>
+  <main class="surface surface-compact">
+    <h1>Device Restarting</h1>
+    <div class="spinner" role="status" aria-label="Restarting"></div>
+    <p>The controller is rebooting. Redirecting to the dashboard in <strong id="countdown">10</strong> seconds.</p>
+    <p><a href="/">Open the dashboard manually</a></p>
+  </main>
+  <script>
+    let counter=10;
+    const countdownEl=document.getElementById("countdown");
+    const tick=()=>{
+      countdownEl.textContent=counter;
+      counter-=1;
+      if(counter<0){window.location.href="/";return;}
+      setTimeout(tick,1000);
+    };
+    document.addEventListener("DOMContentLoaded",tick);
+  </script>
+</body>
+</html>
