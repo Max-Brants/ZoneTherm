@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <strings.h>
 #include <vector>
 
 #include "esp_crt_bundle.h"
@@ -73,6 +74,18 @@ bool repoLooksValid(const std::string& repo) {
 std::string assetUrl(const std::string& repo, const std::string& tag,
                      const char* asset) {
     return "https://github.com/" + repo + "/releases/download/" + tag + "/" + asset;
+}
+
+// esp_http_client_get_header() reads the *request* headers; the only way at a
+// response header is this event, dispatched once per complete header line with
+// user_data pointing at the std::string to fill.
+esp_err_t captureLocation(esp_http_client_event_t* evt) {
+    if (evt->event_id == HTTP_EVENT_ON_HEADER && evt->user_data &&
+        evt->header_key && evt->header_value &&
+        strcasecmp(evt->header_key, "Location") == 0) {
+        *static_cast<std::string*>(evt->user_data) = evt->header_value;
+    }
+    return ESP_OK;
 }
 
 }  // namespace
@@ -322,6 +335,7 @@ void UpdateService::doInstall() {
 bool UpdateService::fetchLatestTag(const std::string& repo, std::string& tagOut,
                                    std::string& errorOut) {
     const std::string url = "https://github.com/" + repo + "/releases/latest";
+    std::string location;
 
     esp_http_client_config_t cfg = {};
     cfg.url = url.c_str();
@@ -329,6 +343,8 @@ bool UpdateService::fetchLatestTag(const std::string& repo, std::string& tagOut,
     cfg.timeout_ms = kHttpTimeoutMs;
     cfg.crt_bundle_attach = esp_crt_bundle_attach;
     cfg.user_agent = kUserAgent;
+    cfg.event_handler = captureLocation;
+    cfg.user_data = &location;
     cfg.disable_auto_redirect = true;  // the redirect *is* the answer
 
     esp_http_client_handle_t client = esp_http_client_init(&cfg);
@@ -345,18 +361,16 @@ bool UpdateService::fetchLatestTag(const std::string& repo, std::string& tagOut,
         errorOut = "no response headers";
     } else {
         const int status = esp_http_client_get_status_code(client);
-        char* location = nullptr;  // owned by the client, must not be freed
-        esp_http_client_get_header(client, "Location", &location);
 
         if (status != 301 && status != 302 && status != 307 && status != 308) {
             errorOut = "unexpected HTTP " + std::to_string(status) +
                        " (check the repository name)";
-        } else if (!location) {
+        } else if (location.empty()) {
             errorOut = "redirect without a Location header";
         } else {
             // .../releases/tag/v1.2.3 on success; a repo with no releases at all
             // redirects to .../releases instead.
-            const std::string loc(location);
+            const std::string& loc = location;
             const std::string marker = "/releases/tag/";
             const size_t at = loc.find(marker);
             if (at == std::string::npos) {
