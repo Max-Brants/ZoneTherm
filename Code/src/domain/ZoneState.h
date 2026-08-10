@@ -5,7 +5,14 @@
 
 #include <cstdint>
 
-constexpr int kNumZones = 7;
+constexpr int kNumZones = 7;   // thermostat channels (OpenTherm slave ports)
+constexpr int kNumValves = 7;  // valve outputs V1..V7 on the MCP23017 port B
+
+// A thermostat drives a set of valves, carried as a bitmask with V1 = bit 0.
+// The two counts are independent on purpose: they are equal on this board, but
+// nothing below couples a thermostat index to a valve index any more.
+static_assert(kNumValves <= 8, "valve sets are carried in a uint8_t");
+constexpr uint8_t kAllValvesMask = static_cast<uint8_t>((1u << kNumValves) - 1);
 
 // Global season: one heating/cooling plant, all zones follow it.
 enum class Season : uint8_t {

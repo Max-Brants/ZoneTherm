@@ -11,9 +11,12 @@ const char* TAG = "ValveBank";
 
 constexpr uint8_t kMcpAddress = 0x20;
 
-// Zone index -> port B bit. Zone 0 sits on bit 1 (not bit 0) - that is how
-// the PCB routes the valve outputs.
-inline uint8_t zoneBit(int zone) { return 1u << (zone + 1); }
+// Valve set -> port B bits. Valve 0 (V1) sits on bit 1, not bit 0 - that is
+// how the PCB routes the outputs, so the whole bank is just the mask shifted
+// up one. 0x7F << 1 == 0xFE, so bit 0 stays low.
+inline uint8_t portBits(uint8_t valveMask) {
+    return static_cast<uint8_t>((valveMask & kAllValvesMask) << 1);
+}
 
 }  // namespace
 
@@ -47,20 +50,22 @@ void ValveBank::begin(uint8_t sdaPin, uint8_t sclPin) {
     ESP_LOGI(TAG, "MCP23017 ready, all valves closed");
 }
 
-void ValveBank::set(int zone, bool open) {
-    if (!present_ || zone < 0 || zone >= kNumZones) return;
+void ValveBank::setMask(uint8_t valveMask) {
+    if (!present_) return;
 
-    const uint8_t next = open ? (shadow_ | zoneBit(zone))
-                              : (shadow_ & ~zoneBit(zone));
+    const uint8_t next = portBits(valveMask);
     if (next == shadow_) return;
 
+    const uint8_t changed = static_cast<uint8_t>((next ^ shadow_) >> 1);
     shadow_ = next;
     mcp_->writePort(MCP23017Port::B, shadow_);
-    ESP_LOGI(TAG, "Zone %d valve %s (port B = 0x%02X)", zone + 1,
-             open ? "OPEN" : "CLOSED", shadow_);
+    ESP_LOGI(TAG, "Valves changed 0x%02X -> open 0x%02X (port B = 0x%02X)",
+             changed, valveMask & kAllValvesMask, shadow_);
 }
 
-bool ValveBank::isOpen(int zone) const {
-    if (zone < 0 || zone >= kNumZones) return false;
-    return shadow_ & zoneBit(zone);
+bool ValveBank::isValveOpen(int valve) const {
+    if (valve < 0 || valve >= kNumValves) return false;
+    return ((shadow_ >> 1) & (1u << valve)) != 0;
 }
+
+uint8_t ValveBank::mask() const { return static_cast<uint8_t>(shadow_ >> 1); }

@@ -25,6 +25,25 @@
   let zones: ZoneConfig[] = $state([]);
   let note = $state('');
 
+  const VALVES = [1, 2, 3, 4, 5, 6, 7];
+
+  // valve -> owning zone id, recomputed from local state so unchecking a valve
+  // in one row immediately frees it in the others without a round trip. This
+  // is what keeps the exclusivity rule from ever reaching the API as a 400.
+  let owner = $derived.by(() => {
+    const m = new Map<number, number>();
+    for (const z of zones) for (const v of z.valves ?? []) m.set(v, z.id);
+    return m;
+  });
+  let unassigned = $derived(VALVES.filter((v) => !owner.has(v)));
+
+  function toggleValve(zone: ZoneConfig, valve: number): void {
+    const set = new Set(zone.valves ?? []);
+    if (set.has(valve)) set.delete(valve);
+    else set.add(valve);
+    zone.valves = [...set].sort((a, b) => a - b);
+  }
+
   async function load(): Promise<void> {
     try {
       const cfg = await fetchJSON<AppConfig>('/api/config');
@@ -46,7 +65,7 @@
       updRepo = cfg.update.repo;
       updInterval = cfg.update.checkIntervalH;
       updFs = cfg.update.includeFilesystem;
-      zones = (cfg.zones ?? []).map((z) => ({ ...z }));
+      zones = (cfg.zones ?? []).map((z) => ({ ...z, valves: [...(z.valves ?? [])] }));
     } catch (err) {
       console.error('Failed to load config', err);
       note = 'Failed to load configuration.';
@@ -73,7 +92,12 @@
         checkIntervalH: Math.trunc(updInterval) || 24,
         includeFilesystem: updFs,
       },
-      zones: zones.map((z) => ({ id: z.id, name: z.name, enabled: z.enabled })),
+      zones: zones.map((z) => ({
+        id: z.id,
+        name: z.name,
+        enabled: z.enabled,
+        valves: z.valves ?? [],
+      })),
     };
     note = 'Saving…';
     try {
@@ -90,7 +114,7 @@
       }
     } catch (err) {
       console.error('Save failed', err);
-      note = 'Save failed.';
+      note = err instanceof Error ? err.message : 'Save failed.';
     }
   }
 
@@ -176,7 +200,10 @@
 
   <section class="section">
     <h2>Zones</h2>
-    <p>Disabled zones answer their thermostat but keep the valve closed.</p>
+    <p>Disabled zones answer their thermostat but keep every valve closed. A
+      thermostat drives as many valves as you tick — three loops of one room, say
+      — and each valve (V1–V7, matching the PCB terminals) belongs to exactly one
+      thermostat, so a valve already taken is greyed out here.</p>
     <div>
       {#each zones as zone (zone.id)}
         <div class="zone-row">
@@ -184,7 +211,27 @@
           <input type="text" maxlength="32" aria-label="Zone {zone.id} name" bind:value={zone.name}>
           <label class="switch"><input type="checkbox" bind:checked={zone.enabled}><span class="track"></span>Enabled</label>
         </div>
+        <div class="valve-row">
+          <span class="valve-label">Valves</span>
+          {#each VALVES as v (v)}
+            {@const takenBy = owner.get(v)}
+            {@const mine = takenBy === zone.id}
+            <label class="valve" class:locked={takenBy !== undefined && !mine}
+                   title={takenBy !== undefined && !mine ? `Assigned to thermostat ${takenBy}` : `Valve V${v}`}>
+              <input type="checkbox" checked={mine}
+                     disabled={takenBy !== undefined && !mine}
+                     aria-label="Zone {zone.id} valve V{v}"
+                     onchange={() => toggleValve(zone, v)}>V{v}
+            </label>
+          {/each}
+          {#if (zone.valves ?? []).length === 0}
+            <span class="warn">no valves — this thermostat cannot heat</span>
+          {/if}
+        </div>
       {/each}
+      {#if unassigned.length}
+        <p class="warn">Unassigned: {unassigned.map((v) => `V${v}`).join(', ')} — these valves stay closed.</p>
+      {/if}
     </div>
   </section>
 
@@ -210,6 +257,11 @@
   .zone-row{display:flex;align-items:center;gap:1rem;padding:.4rem 0}
   .zone-row .zone-id{width:2rem;opacity:.7}
   .zone-row input[type=text]{flex:1;padding:.45rem .6rem;border-radius:8px;border:1px solid rgba(128,128,128,.35);background:transparent;color:inherit;font:inherit}
+  .valve-row{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:0 0 .7rem 3rem}
+  .valve-label{font-size:.85rem;opacity:.7}
+  .valve{display:inline-flex;align-items:center;gap:.3rem;font-size:.85rem;padding:.2rem .5rem;border-radius:999px;border:1px solid rgba(128,128,128,.35)}
+  .valve.locked{opacity:.35;cursor:not-allowed}
+  .warn{font-size:.85rem;color:#e08a2e}
   .form-actions{display:flex;gap:1rem;align-items:center;margin-top:1rem;flex-wrap:wrap}
   .save-note{opacity:.8}
   .danger{border:1px solid rgba(220,60,60,.4);border-radius:12px;padding:1rem}

@@ -1,0 +1,85 @@
+name: CI
+
+# Runs on every push and pull request, unlike release.yml which only fires on
+# a tag. Two independent checks:
+#
+#   tests - host unit tests for src/domain (pio test -e native). No hardware,
+#           no toolchain download, seconds to run.
+#   build - the real ESP32-S3 firmware build, so a compile break surfaces here
+#           instead of when a release tag is pushed.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  tests:
+    name: Host unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # env:native needs no platform toolchain, so this cache is small and
+      # separate from the firmware job's.
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: pio-native-${{ runner.os }}-${{ hashFiles('Code/platformio.ini') }}
+          restore-keys: pio-native-${{ runner.os }}-
+
+      - name: Install PlatformIO
+        run: pip install --upgrade platformio
+
+      - name: Run domain tests
+        working-directory: Code
+        run: pio test -e native
+
+  build:
+    name: Firmware build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # webui_build.py runs as a post action on the device env, so the Node
+      # toolchain has to be present even for a plain `pio run`.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: Code/webui/package-lock.json
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: pio-${{ runner.os }}-${{ hashFiles('Code/platformio.ini', 'Code/src/idf_component.yml') }}
+          restore-keys: pio-${{ runner.os }}-
+
+      - name: Install PlatformIO
+        run: pip install --upgrade platformio
+
+      - name: Build firmware
+        working-directory: Code
+        run: pio run -e esp32-s3-devkitc-1
+
+      - name: Build filesystem image
+        working-directory: Code
+        run: pio run -e esp32-s3-devkitc-1 -t buildfs

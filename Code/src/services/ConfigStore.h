@@ -31,6 +31,14 @@ struct MqttConfig {
 struct ZoneConfig {
     std::string name;       // default "Thermostat <n>"
     bool enabled = true;
+
+    // Valve outputs this thermostat drives; bit v = valve v, V1 = bit 0. A
+    // thermostat may drive several (a room with three underfloor loops) and a
+    // valve belongs to at most one thermostat. 0 means the thermostat still
+    // answers and still tracks its band, but opens nothing - a deliberately
+    // fail-safe struct default. applyDefaults() installs the legacy 1:1
+    // mapping (zone i -> valve i).
+    uint8_t valveMask = 0;
 };
 
 struct ControlConfig {

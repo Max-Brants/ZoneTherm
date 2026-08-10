@@ -29,10 +29,18 @@ you turn the dial. While answering, ZoneTherm captures the two numbers that
 matter: the room temperature the thermostat measured, and the setpoint it is
 asking for.
 
-It then makes the only decision that is actually its own: for each zone,
-should the valve be open? That is a bang-bang comparison with a symmetric
+It then makes the only decision that is actually its own: for each thermostat,
+should heat be flowing? That is a bang-bang comparison with a symmetric
 hysteresis band, and it lives in exactly one function
 ([`ClimateLogic::valveWanted`](Code/src/domain/ClimateLogic.h)).
+
+Each thermostat drives a **valve set** — one valve, or several. A room with
+three underfloor loops has three actuators and one thermostat, and they open
+and close together in a single I²C write.
+[`ValvePlan::solve`](Code/src/domain/ValvePlan.h) turns the seven per-room
+answers into the one byte the expander wants. A valve belongs to at most one
+thermostat, which the web UI enforces by greying out valves already taken and
+the API enforces by rejecting the save.
 
 One **season** — heating or cooling — applies to the whole plant, because
 there is one set of pipes. Individual zones can be disabled, but they cannot
@@ -48,8 +56,15 @@ or the web UI is written back to the room thermostat over OpenTherm's
   main firmware. It terminates all seven OpenTherm links itself and drives
   valves; your boiler is expected to be commanded by something else (a valve
   end-switch loop, or its own thermostat input).
-- A zone whose thermostat has never reported a room temperature keeps its valve
+- A zone whose thermostat has never reported a room temperature keeps its valves
   **closed**, as does a disabled zone. There is no fail-open.
+- The same goes for the two ways a valve set can be misconfigured: a thermostat
+  with **no valves** keeps tracking its band and reporting demand but opens
+  nothing, and a valve **claimed by nobody** never opens. Both are flagged on
+  the config page and logged at boot rather than silently guessed at.
+- Upgrading from a pre-valve-set firmware leaves the wiring alone: every
+  thermostat comes up owning the one valve on its own channel, exactly as
+  before.
 - `boilerTemp`, `flameOn`, `fault` and friends exist in the zone state and are
   parsed off the wire, but only `outside_temperature` and `modulation` are
   currently exported as Home Assistant sensors.
@@ -63,7 +78,7 @@ or the web UI is written back to the room thermostat over OpenTherm's
 | [Code/](Code/) | ESP32-S3 firmware (ESP-IDF via PlatformIO). See [Code/README.md](Code/README.md) for the architecture write-up. |
 | [Code/webui/](Code/webui/) | Svelte 5 + Vite + TypeScript single-page app, built into `Code/data/` and flashed as a LittleFS image. |
 | [pcb/](pcb/) | KiCad 8 project `ZoneTherm.kicad_pro` — seven OpenTherm slave interfaces, W5500 Ethernet, MCP23017 valve bank. Fabrication outputs in `GERBER/`, `production/`, `jlcpcb/`. |
-| [enclosure/](enclosure/) | Placeholder — empty. |
+| [enclosure/](enclosure/) | Three-part printed case, generated from the KiCad board by a script rather than measured off it. See [enclosure/README.md](enclosure/README.md) — **read the mains section before printing one**. |
 | [.github/workflows/](.github/workflows/) | Release workflow that builds and publishes the OTA assets. |
 
 ---
@@ -152,7 +167,7 @@ tree**. Open `http://<device>/config` (or `POST /api/config`) and set:
 - MQTT broker host, port, username, password, base topic, discovery prefix
 - season (heating / cooling)
 - valve hysteresis
-- per-zone name and enabled flag
+- per-zone name, enabled flag, and valve set
 - update repo, check interval, auto-install, include-filesystem
 
 Settings persist in NVS namespace `otcfg`. `POST /api/factory-reset` erases it.
@@ -182,7 +197,18 @@ while the device is rebooting or when assets are missing.
 
 Each zone in `/api/thermostats` carries: `id`, `name`, `enabled`, `status`
 (`Active`/`Inactive`), `currentTemp`, `setpoint`, `outsideTemp`, `modulation`,
-`valveOpen`, `action`, `errorCode`, `totalRequests`, `failedRequests`.
+`valves`, `valveOpen`, `action`, `errorCode`, `totalRequests`, `failedRequests`.
+
+`valves` is the set this thermostat drives, as 1-based valve numbers —
+`"valves": [1, 2, 3]` for a room with three loops. `valveOpen` means *at least
+one of them is open*, so it is false for a thermostat that owns none. The same
+array is read and written by `/api/config`; a `POST` that gives one valve to two
+thermostats is rejected with `400` and changes nothing:
+
+```bash
+curl -X POST http://zonetherm.local/api/config -H 'Content-Type: application/json' \
+  -d '{"zones":[{"id":1,"valves":[1,2,3]},{"id":2,"valves":[4,5]}]}'
+```
 
 ---
 
@@ -269,8 +295,8 @@ Full write-up in [Code/README.md](Code/README.md). The short version:
 - `Main.cpp` is the composition root — every object is built there and wired by
   reference. No singletons.
 - `domain/` is pure logic with no ESP-IDF includes — the frame codec, the request
-  responder, the zone registry, and the valve decision — so it can be compiled
-  off-device.
+  responder, the zone registry, the per-room valve decision and the valve-set
+  aggregation — so it can be compiled off-device.
 - A dedicated `ot_task` (core 1, priority 15) owns all OpenTherm I/O. Responses
   are transmitted 40 ms after the request **by deadline** rather than by
   sleeping, so one channel cannot stall the other six.

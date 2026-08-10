@@ -128,7 +128,15 @@
     </label>
   </div>
   <div class="details">
-    <span>Valve <strong>{t.valveOpen ? 'Open' : 'Closed'}</strong></span>
+    <span>
+      {#if t.valves?.length}
+        {t.valves.length === 1 ? 'Valve' : 'Valves'}
+        <strong>{t.valves.map((v) => `V${v}`).join(' ')}</strong>
+        {t.valveOpen ? 'open' : 'closed'}
+      {:else}
+        Valves <strong>none</strong>
+      {/if}
+    </span>
     <span>Requests <strong>{t.totalRequests}</strong></span>
     <span>Failed <strong>{t.failedRequests}</strong></span>
     {#if t.errorCode}<span>Error {t.errorCode}</span>{/if}

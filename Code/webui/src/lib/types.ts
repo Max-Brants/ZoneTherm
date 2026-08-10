@@ -25,7 +25,8 @@ export interface Thermostat {
   currentTemp: number;
   setpoint: number;
   enabled: boolean;
-  valveOpen: boolean;
+  valves: number[]; // the valves this thermostat drives; empty = drives nothing
+  valveOpen: boolean; // at least one valve in `valves` is open
   totalRequests: number;
   failedRequests: number;
   errorCode?: number;
@@ -42,6 +43,7 @@ export interface ZoneConfig {
   id: number;
   name: string;
   enabled: boolean;
+  valves: number[]; // 1-based valve numbers V1..V7; exclusive across zones
 }
 
 export interface AppConfig {
