@@ -6,6 +6,7 @@
 #include "esp_timer.h"
 
 #include "../domain/ClimateLogic.h"
+#include "../domain/ValvePlan.h"
 #include "../util/Json.h"
 #include "../util/StringUtils.h"
 #include "HaDiscovery.h"
@@ -165,7 +166,8 @@ void MqttService::publishZoneState(int zone, const AppConfig& cfg) {
     const ZoneSnapshot z = zones_.snapshot(zone);
     const std::string zoneTopic =
         cfg.mqtt.baseTopic + "/thermostat/" + std::to_string(zone + 1);
-    const bool valveOpen = control_.valveOpen(zone);
+    const bool valveOpen =
+        ValvePlan::anyOpen(cfg.zones[zone].valveMask, control_.openValveMask());
     const bool enabled = cfg.zones[zone].enabled;
 
     publish(zoneTopic + "/temperature", formatTemp(z.roomTemp));

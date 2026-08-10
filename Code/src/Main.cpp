@@ -11,6 +11,7 @@
 #include "app/Pins.h"
 #include "app/Version.h"
 #include "domain/ClimateLogic.h"
+#include "domain/ValvePlan.h"
 #include "domain/ZoneRegistry.h"
 #include "drivers/ValveBank.h"
 #include "net/MdnsService.h"
@@ -30,15 +31,17 @@ const char* TAG = "Main";
 
 void logZoneStatus(ZoneRegistry& zones, ControlService& control,
                    const AppConfig& cfg) {
+    const uint8_t openValves = control.openValveMask();
     for (int i = 0; i < kNumZones; i++) {
         const ZoneSnapshot z = zones.snapshot(i);
+        const bool valveOpen =
+            ValvePlan::anyOpen(cfg.zones[i].valveMask, openValves);
         ESP_LOGI(TAG,
-                 "Zone %d (%s): %.1f/%.1f degC %s valve=%s req=%lu fail=%lu",
+                 "Zone %d (%s): %.1f/%.1f degC %s valves=0x%02X %s req=%lu fail=%lu",
                  i + 1, cfg.zones[i].name.c_str(), z.roomTemp, z.setpoint,
                  ClimateLogic::actionString(cfg.zones[i].enabled,
-                                            cfg.control.mode,
-                                            control.valveOpen(i)),
-                 control.valveOpen(i) ? "open" : "closed",
+                                            cfg.control.mode, valveOpen),
+                 cfg.zones[i].valveMask, valveOpen ? "open" : "closed",
                  static_cast<unsigned long>(z.totalRequests),
                  static_cast<unsigned long>(z.failedRequests));
     }

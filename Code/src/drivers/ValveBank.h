@@ -1,6 +1,9 @@
-// The seven zone valves behind the MCP23017 I2C expander (port B).
+// The seven valve outputs behind the MCP23017 I2C expander (port B).
 // Replaces the old Valve + HardwareManager pair; the shadow latch makes
-// isOpen() real instead of the old hardcoded-true stub.
+// isValveOpen() real instead of the old hardcoded-true stub.
+//
+// Valves are indexed independently of thermostats - which thermostat drives
+// which valve is a config question, answered in ValvePlan/ControlService.
 
 #pragma once
 
@@ -13,12 +16,18 @@ class MCP23017;
 class ValveBank {
 public:
     // Creates the I2C bus and probes for the expander; if it is absent,
-    // valve control is disabled (set() becomes a no-op) but the rest of
+    // valve control is disabled (setMask() becomes a no-op) but the rest of
     // the firmware keeps running.
     void begin(uint8_t sdaPin, uint8_t sclPin);
 
-    void set(int zone, bool open);  // writes I2C only on actual change
-    bool isOpen(int zone) const;
+    // bit v set (V1 = bit 0) = valve v open. The whole bank moves in one I2C
+    // write, and only when something actually changed - so the three loops of
+    // a single room open in the same transaction instead of three, with no
+    // window where half the set has moved.
+    void setMask(uint8_t valveMask);
+
+    bool isValveOpen(int valve) const;
+    uint8_t mask() const;  // logical (unshifted) mask, for diagnostics
     bool present() const { return present_; }
 
 private:

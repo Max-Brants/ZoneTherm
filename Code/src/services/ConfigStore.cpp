@@ -6,13 +6,19 @@
 #include "esp_mac.h"
 #include "nvs.h"
 
+#include "../domain/ValvePlan.h"
+
 namespace {
 
 const char* TAG = "ConfigStore";
 
 constexpr const char* kNamespace = "otcfg";
 constexpr const char* kLegacyNamespace = "opentherm";
-constexpr uint8_t kSchemaVersion = 2;  // v2 added the update.* keys
+// v2 added the update.* keys; v3 added the z<i>_vlv valve sets. Note that
+// "ver" is only ever read as a written-once sentinel by migrateLegacy() and is
+// never compared against this number - the actual forward migration is the
+// absent-key-keeps-the-default idiom in readNvs().
+constexpr uint8_t kSchemaVersion = 3;
 
 // Where UpdateService looks for releases out of the box. Overridable from the
 // web UI, so a fork only has to change it once at runtime.
@@ -98,6 +104,12 @@ void ConfigStore::applyDefaults() {
     cfg_.update.repo = kDefaultRepo;
     for (int i = 0; i < kNumZones; i++) {
         cfg_.zones[i].name = "Thermostat " + std::to_string(i);
+        // The legacy 1:1 mapping. Pre-v3 stores have no z<i>_vlv key and
+        // readNvs() only overwrites keys that exist, so an upgraded install
+        // keeps the wiring it has always had. This line is the whole upgrade
+        // guarantee - do not change it without a real migration.
+        cfg_.zones[i].valveMask =
+            (i < kNumValves) ? static_cast<uint8_t>(1u << i) : 0;
     }
 }
 
@@ -174,6 +186,22 @@ void ConfigStore::readNvs() {
         cfg_.zones[i].name = readStr(handle, key, cfg_.zones[i].name);
         std::snprintf(key, sizeof(key), "z%d_en", i);
         cfg_.zones[i].enabled = readU8(handle, key, cfg_.zones[i].enabled ? 1 : 0) != 0;
+        std::snprintf(key, sizeof(key), "z%d_vlv", i);
+        cfg_.zones[i].valveMask = static_cast<uint8_t>(
+            readU8(handle, key, cfg_.zones[i].valveMask) & kAllValvesMask);
+    }
+
+    // A corrupt or hand-edited store could claim one valve twice. Nothing
+    // downstream breaks - the tick ORs the masks - but the UI would then be
+    // rendering a state it will not let you create, so first zone wins.
+    ValvePlan::Masks masks{};
+    for (int i = 0; i < kNumZones; i++) masks[i] = cfg_.zones[i].valveMask;
+    if (ValvePlan::dropOverlaps(masks)) {
+        ESP_LOGW(TAG, "Stored valve sets overlapped; dropped the duplicate claims");
+        for (int i = 0; i < kNumZones; i++) cfg_.zones[i].valveMask = masks[i];
+    }
+    if (const uint8_t idle = ValvePlan::unassigned(masks)) {
+        ESP_LOGW(TAG, "Valves 0x%02X belong to no thermostat and stay closed", idle);
     }
 
     nvs_close(handle);
@@ -215,6 +243,8 @@ void ConfigStore::writeNvs() const {
         nvs_set_str(handle, key, cfg_.zones[i].name.c_str());
         std::snprintf(key, sizeof(key), "z%d_en", i);
         nvs_set_u8(handle, key, cfg_.zones[i].enabled ? 1 : 0);
+        std::snprintf(key, sizeof(key), "z%d_vlv", i);
+        nvs_set_u8(handle, key, cfg_.zones[i].valveMask);
     }
 
     err = nvs_commit(handle);

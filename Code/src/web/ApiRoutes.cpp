@@ -10,6 +10,7 @@
 #include "esp_timer.h"
 
 #include "../app/Version.h"
+#include "../domain/ValvePlan.h"
 #include "../services/ZoneJson.h"
 #include "../util/Json.h"
 #include "../util/Reboot.h"
@@ -140,11 +141,13 @@ esp_err_t handleApiThermostats(httpd_req_t* req) {
     cJSON_AddStringToObject(o, "mode",
                             cfg.control.mode == Season::Heating ? "heating" : "cooling");
 
+    const uint8_t openValves = ctx->control.openValveMask();
     cJSON* list = cJSON_AddArrayToObject(o, "thermostats");
     for (int i = 0; i < kNumZones; i++) {
-        cJSON_AddItemToArray(list, zoneToJson(snapshots[i], cfg.zones[i], i,
-                                              cfg.control.mode,
-                                              ctx->control.valveOpen(i), now));
+        cJSON_AddItemToArray(
+            list, zoneToJson(snapshots[i], cfg.zones[i], i, cfg.control.mode,
+                             ValvePlan::anyOpen(cfg.zones[i].valveMask, openValves),
+                             now));
     }
     return sendJson(req, doc.dump());
 }
@@ -267,6 +270,7 @@ esp_err_t handleGetConfig(httpd_req_t* req) {
         cJSON_AddNumberToObject(z, "id", i + 1);
         cJSON_AddStringToObject(z, "name", cfg.zones[i].name.c_str());
         cJSON_AddBoolToObject(z, "enabled", cfg.zones[i].enabled);
+        jsonAddValveArray(z, "valves", cfg.zones[i].valveMask);
         cJSON_AddItemToArray(zones, z);
     }
 
@@ -297,6 +301,41 @@ esp_err_t handlePostConfig(httpd_req_t* req) {
         return sendError(req, "Invalid JSON");
     }
     cJSON* o = doc.get();
+
+    // Valve sets are exclusive and this POST may be partial, so the check has
+    // to run against the MERGED result - zones the body does not mention keep
+    // what they have - and it has to run before mutate(), which persists
+    // unconditionally and has no rollback.
+    ValvePlan::Masks masks{};
+    {
+        const AppConfig current = ctx->config.get();
+        for (int i = 0; i < kNumZones; i++) masks[i] = current.zones[i].valveMask;
+    }
+    bool valvesGiven = false;
+    if (cJSON* zones = cJSON_GetObjectItemCaseSensitive(o, "zones")) {
+        cJSON* z = nullptr;
+        cJSON_ArrayForEach(z, zones) {
+            const int id = static_cast<int>(json::getNumber(z, "id", 0));
+            if (id < 1 || id > kNumZones) continue;
+            cJSON* list = cJSON_GetObjectItemCaseSensitive(z, "valves");
+            if (!cJSON_IsArray(list)) continue;  // absent = leave this zone alone
+            uint8_t mask = 0;
+            cJSON* v = nullptr;
+            cJSON_ArrayForEach(v, list) {
+                const int valve =
+                    cJSON_IsNumber(v) ? static_cast<int>(v->valuedouble) : 0;
+                if (valve < 1 || valve > kNumValves) {
+                    return sendError(req, "Valve numbers must be 1-7");
+                }
+                mask |= static_cast<uint8_t>(1u << (valve - 1));
+            }
+            masks[id - 1] = mask;  // a repeated id wins last, like name/enabled
+            valvesGiven = true;
+        }
+    }
+    if (!ValvePlan::exclusive(masks)) {
+        return sendError(req, "Each valve can belong to only one thermostat");
+    }
 
     bool rebootRequired = false;
     bool mqttChanged = false;
@@ -380,6 +419,14 @@ esp_err_t handlePostConfig(httpd_req_t* req) {
                 if (!name.empty() && name.length() <= 32) zc.name = name;
                 zc.enabled = json::getBool(z, "enabled", zc.enabled);
             }
+        }
+
+        // Applied as a set, not per entry: `masks` was seeded from the current
+        // config above, so zones the body omitted are written back unchanged.
+        // Seeding outside the lock is safe because this handler is the only
+        // writer of valveMask - the MQTT command path only touches `enabled`.
+        if (valvesGiven) {
+            for (int i = 0; i < kNumZones; i++) cfg.zones[i].valveMask = masks[i];
         }
     });
 

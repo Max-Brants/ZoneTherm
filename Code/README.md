@@ -6,7 +6,9 @@ wiring, API and Home Assistant surface, see the [root README](../README.md).
 ESP32-S3 firmware that emulates an OpenTherm **boiler** on 7 channels. Each
 channel has a real room thermostat (OpenTherm master) plugged in; the
 controller answers its requests, captures the room temperature and setpoint
-it reports, and drives that zone's valve through an MCP23017 I2C expander.
+it reports, and drives that thermostat's valve set through an MCP23017 I2C
+expander. A thermostat can own several valves (a room with three underfloor
+loops) or none, and a valve belongs to at most one thermostat.
 One global season (heating/cooling) applies to all zones.
 
 Integrations: MQTT with Home Assistant auto-discovery (one climate + two
@@ -19,6 +21,36 @@ PlatformIO (primary): `pio run`, web assets: `pio run -t buildfs`, flash
 with `pio run -t upload` / `-t uploadfs`. Raw ESP-IDF (`idf.py build`) works
 too.
 
+## Testing
+
+`pio test -e native` runs the host unit tests. The `native` env is plain g++
+against libstdc++ - no board, no framework, no IDF - and `build_src_filter`
+limits it to `src/domain/`, which is the tested boundary. Suites live in
+`test/`:
+
+| Suite | Covers |
+|---|---|
+| `test_ot_frame` | frame codec: parity, field extraction, f8.8 fixed point |
+| `test_ot_responder` | every data ID the slave answers, and its state delta |
+| `test_climate_logic` | hysteresis band, both seasons, the fail-safe paths |
+| `test_zone_registry` | sparse-delta merge, dirty mask, setpoint clamp |
+| `test_string_utils` | urlDecode/trim/parsing on the HTTP request path |
+| `test_valve_plan` | valve-set aggregation, the demand latch, exclusivity, unassigned valves |
+
+CI is where these normally run - `.github/workflows/ci.yml` runs them plus a
+full firmware build on every push and PR, and `release.yml` runs them before
+publishing OTA assets.
+
+Running them locally needs `gcc`/`g++` on `PATH`. PlatformIO's `native`
+platform shells out to those names specifically, so an MSVC install does not
+satisfy it - on a stock Windows box every suite ERRORs with `'g++' is not
+recognized` before compiling anything. Install MSYS2/MinGW to run them here,
+or just let CI do it.
+
+A few tests assert behavior worth questioning rather than behavior worth
+keeping - the staleness hold in `test_climate_logic` and the 0 degC sentinel
+in `test_ot_responder`. Each is flagged with a comment saying so.
+
 ## Source layout
 
 `Main.cpp` is the composition root - it builds every object and wires them
@@ -30,7 +62,9 @@ src/
   domain/     pure logic, no ESP-IDF includes, compiles off-device:
               OtFrame (frame codec), OtResponder (request -> response +
               state delta), ZoneRegistry (all zone state behind one lock),
-              ClimateLogic (the single valve decision, with hysteresis)
+              ClimateLogic (the per-room decision, with hysteresis),
+              ValvePlan (valve sets -> the open-valve mask, plus the
+              exclusivity rules the API enforces)
   drivers/    OtChannel (vendored OpenTherm wrapper), ValveBank (MCP23017)
   services/   ConfigStore (NVS), OtEngine (OT task, deadline-scheduled
               responses), ControlService (1 Hz valve tick), MqttService,
@@ -52,7 +86,13 @@ esp_http_server run their own tasks. All shared zone state lives in
 Everything is runtime-configurable at **http://\<device\>/config** (or
 `GET/POST /api/config`) and stored in NVS namespace `otcfg`: hostname, WiFi
 credentials, MQTT broker/credentials/topics, season, valve hysteresis, and
-per-zone name + enabled flag. No credentials live in the source tree.
+per-zone name + enabled flag + valve set. No credentials live in the source
+tree.
+
+Valve sets are stored one byte per zone under `z<i>_vlv` (bit v = valve v,
+V1 = bit 0). Stores written before schema v3 have no such key, and `readNvs()`
+only overwrites keys that exist, so an upgraded device keeps the 1:1 mapping
+`applyDefaults()` installs — zone *i* drives valve *i*, exactly as before.
 
 Network bring-up: Ethernet (DHCP, zero config) is primary. Without a link,
 the device joins the configured WiFi as a station; with no WiFi configured
