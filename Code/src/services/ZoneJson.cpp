@@ -47,7 +47,6 @@ cJSON* zoneToJson(const ZoneSnapshot& zone, const ZoneConfig& zoneCfg,
     cJSON_AddNumberToObject(obj, "totalRequests", zone.totalRequests);
     cJSON_AddNumberToObject(obj, "failedRequests", zone.failedRequests);
     cJSON_AddNumberToObject(obj, "errorCode", zone.errorCode);
-    jsonAddRounded(obj, "outsideTemp", zone.outsideTemp);
     jsonAddRounded(obj, "modulation", zone.modulation);
     return obj;
 }

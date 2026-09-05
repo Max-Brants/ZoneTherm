@@ -66,8 +66,8 @@ or the web UI is written back to the room thermostat over OpenTherm's
   thermostat comes up owning the one valve on its own channel, exactly as
   before.
 - `boilerTemp`, `flameOn`, `fault` and friends exist in the zone state and are
-  parsed off the wire, but only `outside_temperature` and `modulation` are
-  currently exported as Home Assistant sensors.
+  parsed off the wire, but only `modulation` is currently exported as a Home
+  Assistant sensor.
 
 ---
 
@@ -196,7 +196,7 @@ while the device is rebooting or when assets are missing.
 | `/ota/start`, `/update` | GET / POST | manual firmware/filesystem image upload |
 
 Each zone in `/api/thermostats` carries: `id`, `name`, `enabled`, `status`
-(`Active`/`Inactive`), `currentTemp`, `setpoint`, `outsideTemp`, `modulation`,
+(`Active`/`Inactive`), `currentTemp`, `setpoint`, `modulation`,
 `valves`, `valveOpen`, `action`, `errorCode`, `totalRequests`, `failedRequests`.
 
 `valves` is the set this thermostat drives, as 1-based valve numbers —
@@ -215,8 +215,8 @@ curl -X POST http://zonetherm.local/api/config -H 'Content-Type: application/jso
 ## MQTT and Home Assistant
 
 Set a broker on `/config` and ZoneTherm publishes **Home Assistant MQTT
-auto-discovery** itself — no YAML. You get one `climate` entity plus two
-sensors per zone.
+auto-discovery** itself — no YAML. You get one `climate` entity plus a
+modulation sensor per zone.
 
 Base topic defaults to `zonetherm/<ID>` and is configurable. Per zone `N`
 (1–7):
@@ -229,7 +229,6 @@ Base topic defaults to `zonetherm/<ID>` and is configurable. Per zone `N`
 | `thermostat/N/setpoint/state` | active setpoint |
 | `thermostat/N/mode/state` | `off` \| `heat` \| `cool` |
 | `thermostat/N/action` | `off` \| `idle` \| `heating` \| `cooling` |
-| `thermostat/N/outside_temperature` | °C |
 | `thermostat/N/modulation` | % |
 | `thermostat/N/state` | JSON attributes blob |
 

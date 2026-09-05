@@ -107,8 +107,6 @@ void test_from_temperature_clamps_to_zero_and_hundred() {
 
 // Pinned, not endorsed: fromTemperature() clamps at 0, so the firmware can
 // never transmit a sub-zero temperature even though toFloat() can receive one.
-// Reading back a stored negative outside temperature yields 0 degC on the wire.
-// See OtResponder's Toutside read path.
 void test_from_temperature_cannot_express_negatives() {
     const ot::Frame f = rawFrame(0, 0, ot::fromTemperature(-5.0f));
     TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.0f, ot::toFloat(f));

@@ -28,7 +28,6 @@ void ZoneRegistry::applyDelta(int zone, const OtResponder::Delta& delta) {
     if (delta.setRoomTemp) z.roomTemp = delta.roomTemp;
     if (delta.setCoolingControl) z.coolingControl = delta.coolingControl;
     if (delta.setBoilerTemp) z.boilerTemp = delta.boilerTemp;
-    if (delta.setOutsideTemp) z.outsideTemp = delta.outsideTemp;
     if (delta.setModulation) z.modulation = delta.modulation;
     if (delta.clearOverride) z.overrideSetpoint = 0;
     if (delta.setSetpoint && z.setpoint != delta.setpoint) {

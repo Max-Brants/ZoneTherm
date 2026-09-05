@@ -74,7 +74,6 @@ struct SensorSpec {
 };
 
 constexpr SensorSpec kSensors[] = {
-    {"_outside", " Outside Temperature", "/outside_temperature", "°C", "temperature", nullptr},
     {"_mod", " Modulation Level", "/modulation", "%", nullptr, "mdi:fire"},
 };
 

@@ -44,7 +44,6 @@ enum DataId : uint8_t {
     ChPressure = 18,
     Tr = 24,
     Tboiler = 25,
-    Toutside = 27,
     MaxTSet = 57,
     OpenThermVersionSlave = 125,
     MasterVersion = 126,

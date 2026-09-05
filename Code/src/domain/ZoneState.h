@@ -26,7 +26,6 @@ struct ZoneState {
     float overrideSetpoint = 0.0f;  // pending TrOverride push; 0 = no override
     float roomTemp = 0.0f;          // 0 = thermostat has not reported yet
     float boilerTemp = 0.0f;
-    float outsideTemp = 0.0f;
     float modulation = 0.0f;
     float coolingControl = 0.0f;
 

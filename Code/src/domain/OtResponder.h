@@ -26,7 +26,6 @@ struct Delta {
     bool setSetpoint = false;
     bool setCoolingControl = false;
     bool setBoilerTemp = false;
-    bool setOutsideTemp = false;
     bool setModulation = false;
     bool clearOverride = false;
 
@@ -34,13 +33,11 @@ struct Delta {
     float setpoint = 0;
     float coolingControl = 0;
     float boilerTemp = 0;
-    float outsideTemp = 0;
     float modulation = 0;
 
     bool empty() const {
         return !(setRoomTemp || setSetpoint || setCoolingControl ||
-                 setBoilerTemp || setOutsideTemp ||
-                 setModulation || clearOverride);
+                 setBoilerTemp || setModulation || clearOverride);
     }
 };
 

@@ -87,14 +87,12 @@ void test_telemetry_fields_each_land_in_their_own_slot() {
     ZoneRegistry zones;
     OtResponder::Delta d;
     d.setBoilerTemp = true;    d.boilerTemp = 55.0f;
-    d.setOutsideTemp = true;   d.outsideTemp = 8.5f;
     d.setModulation = true;    d.modulation = 42.0f;
     d.setCoolingControl = true; d.coolingControl = 80.0f;
     zones.applyDelta(0, d);
 
     const ZoneSnapshot z = zones.snapshot(0);
     TEST_ASSERT_FLOAT_WITHIN(0.01f, 55.0f, z.boilerTemp);
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 8.5f, z.outsideTemp);
     TEST_ASSERT_FLOAT_WITHIN(0.01f, 42.0f, z.modulation);
     TEST_ASSERT_FLOAT_WITHIN(0.01f, 80.0f, z.coolingControl);
 }

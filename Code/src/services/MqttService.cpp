@@ -179,7 +179,6 @@ void MqttService::publishZoneState(int zone, const AppConfig& cfg) {
     publish(zoneTopic + "/action",
             ClimateLogic::actionString(enabled, cfg.control.mode, valveOpen));
 
-    publish(zoneTopic + "/outside_temperature", formatTemp(z.outsideTemp));
     publish(zoneTopic + "/modulation", formatTemp(z.modulation));
 
     JsonDoc doc(zoneToJson(z, cfg.zones[zone], zone, cfg.control.mode, valveOpen, nowMs()));

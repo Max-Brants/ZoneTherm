@@ -156,19 +156,6 @@ Result handle(ot::Frame request, const ZoneSnapshot& zone, const Context& ctx) {
             break;
         }
 
-        case ot::DataId::Toutside: {
-            if (isWrite) {
-                r.delta.setOutsideTemp = true;
-                r.delta.outsideTemp = f;
-                r.response = ot::buildResponse(ot::MsgType::WriteAck, id, data);
-            } else {
-                r.response = ot::buildResponse(ot::MsgType::ReadAck, id,
-                                               ot::fromTemperature(zone.outsideTemp));
-            }
-            r.hasResponse = true;
-            break;
-        }
-
         case ot::DataId::MaxRelModLevelSetting: {
             r.delta.setModulation = true;
             r.delta.modulation = f;

@@ -150,7 +150,6 @@ void test_room_temp_write_captures_nothing_else() {
                                        ZoneSnapshot{}, ctxFor(true, Season::Heating));
     TEST_ASSERT_FALSE(r.delta.setSetpoint);
     TEST_ASSERT_FALSE(r.delta.setBoilerTemp);
-    TEST_ASSERT_FALSE(r.delta.setOutsideTemp);
     TEST_ASSERT_FALSE(r.delta.setModulation);
     TEST_ASSERT_FALSE(r.delta.setCoolingControl);
     TEST_ASSERT_FALSE(r.delta.clearOverride);
@@ -248,14 +247,6 @@ void test_boiler_temp_write_is_captured_and_read_is_served() {
                                           ctxFor(true, Season::Heating));
     TEST_ASSERT_TRUE(read.delta.empty());
     TEST_ASSERT_FLOAT_WITHIN(0.01f, 55.0f, ot::toFloat(read.response));
-}
-
-void test_outside_temp_write_is_captured() {
-    const auto r = OtResponder::handle(writeTemp(ot::DataId::Toutside, 8.5f),
-                                       ZoneSnapshot{}, ctxFor(true, Season::Heating));
-    TEST_ASSERT_TRUE(r.delta.setOutsideTemp);
-    TEST_ASSERT_FLOAT_WITHIN(0.01f, 8.5f, r.delta.outsideTemp);
-    TEST_ASSERT_FALSE(r.delta.setBoilerTemp);
 }
 
 void test_max_modulation_setting_is_captured_as_modulation() {
@@ -397,7 +388,6 @@ int main() {
     RUN_TEST(test_override_read_with_nothing_pending_reports_zero);
     RUN_TEST(test_override_write_is_not_answered);
     RUN_TEST(test_boiler_temp_write_is_captured_and_read_is_served);
-    RUN_TEST(test_outside_temp_write_is_captured);
     RUN_TEST(test_max_modulation_setting_is_captured_as_modulation);
     RUN_TEST(test_rel_mod_level_read_serves_stored_modulation);
     RUN_TEST(test_cooling_control_is_captured_without_a_plausibility_gate);

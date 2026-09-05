@@ -108,7 +108,7 @@ only fresh or factory-reset devices pick up the `zonetherm-<ID>` /
 
 Base topic default `zonetherm/<ID>` (configurable). Per zone `N` (1-7):
 state topics `thermostat/N/{temperature, setpoint/state, mode/state,
-action, outside_temperature, modulation, state}` and commands
+action, modulation, state}` and commands
 `thermostat/N/{setpoint, mode}/command`. Zone state is republished every
 30 s and on change. Plant-wide: `system/mode/{state,command}` (`heating`/`cooling`)
 and retained availability on `status` (with LWT). A zone's HA climate mode
