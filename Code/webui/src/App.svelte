@@ -1,25 +1,29 @@
 <script lang="ts">
   import { onMount, type Component } from 'svelte';
   import { path } from './lib/router';
-  import { system, refreshSystem } from './lib/system';
-  import TopBar from './components/TopBar.svelte';
-  import Dashboard from './pages/Dashboard.svelte';
-  import Thermostats from './pages/Thermostats.svelte';
-  import Config from './pages/Config.svelte';
+  import { refreshSystem } from './lib/system';
+  import Nav from './components/Nav.svelte';
+  import Zones from './pages/Zones.svelte';
+  import Diagnostics from './pages/Diagnostics.svelte';
+  import Settings from './pages/Settings.svelte';
   import Update from './pages/Update.svelte';
 
+  // Every path here is also a page route in src/web/HttpServer.cpp, so deep
+  // links and reloads work without a catch-all rewrite.
   const routes: Record<string, { component: Component; title: string }> = {
-    '/': { component: Dashboard, title: 'Dashboard' },
-    '/thermostats': { component: Thermostats, title: 'Thermostats' },
-    '/config': { component: Config, title: 'Config' },
+    '/': { component: Zones, title: 'Zones' },
+    '/diagnostics': { component: Diagnostics, title: 'Diagnostics' },
+    '/thermostats': { component: Diagnostics, title: 'Diagnostics' }, // pre-redesign URL
+    '/config': { component: Settings, title: 'Settings' },
     '/update': { component: Update, title: 'Update' },
   };
 
-  const route = $derived(routes[$path] ?? routes['/']);
+  const active = $derived(routes[$path] ? $path : '/');
+  const route = $derived(routes[active]);
   const Page = $derived(route.component);
 
   $effect(() => {
-    document.title = `${route.title} / ${$system?.hostname ?? 'ZoneTherm'}`;
+    document.title = `${route.title} - ZoneTherm`;
   });
 
   onMount(() => {
@@ -29,5 +33,5 @@
   });
 </script>
 
-<TopBar active={$path} />
+<Nav {active} />
 <Page />

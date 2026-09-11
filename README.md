@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="brand/zonetherm-logo-dark.svg">
+  <img src="brand/zonetherm-logo.svg" alt="ZoneTherm" width="282" height="48">
+</picture>
+
 # ZoneTherm
 
 **A 7-zone OpenTherm heating/cooling controller.** ESP32-S3 firmware, KiCad
@@ -176,9 +181,11 @@ Settings persist in NVS namespace `otcfg`. `POST /api/factory-reset` erases it.
 
 ## Web UI and REST API
 
-Four SPA routes are served from LittleFS: `/`, `/thermostats`, `/config`,
-`/update`. `/restart` and a 404 page are standalone HTML so they still render
-while the device is rebooting or when assets are missing.
+The SPA is served from LittleFS at `/` (zones), `/diagnostics` (thermostat
+links and controller state; `/thermostats` is the old name and still works),
+`/config` (settings) and `/update`. `/restart` and a 404 page are standalone
+HTML so they still render while the device is rebooting or when assets are
+missing. The visual identity is documented in [brand/](brand/).
 
 | Endpoint | Method | Purpose |
 |---|---|---|

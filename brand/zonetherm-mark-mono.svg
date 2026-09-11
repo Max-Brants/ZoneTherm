@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 32 32">
+  <!-- ZoneTherm mark, single colour. Inherits currentColor when inlined;
+       stands alone in ink otherwise. Use where the gradient tile cannot be
+       reproduced (silkscreen, engraving, one-colour print). -->
+  <path d="M10 9.5h12l-12 13h12" fill="none" stroke="currentColor" style="color:#1C1B19" stroke-width="4.25" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

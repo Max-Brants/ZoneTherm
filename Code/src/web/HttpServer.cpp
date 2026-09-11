@@ -130,7 +130,7 @@ void HttpServer::start() {
     }
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    // 8 page routes + 10 API + 2 OTA = 20 today. httpd silently refuses to
+    // 9 page routes + 10 API + 2 OTA = 21 today. httpd silently refuses to
     // register past this cap, so keep headroom for the next route.
     config.max_uri_handlers = 26;
     config.uri_match_fn = httpd_uri_match_wildcard;
@@ -146,7 +146,8 @@ void HttpServer::start() {
 
     static httpd_uri_t routes[] = {
         {.uri = "/", .method = HTTP_GET, .handler = handleSpa, .user_ctx = &ctx_},
-        {.uri = "/thermostats", .method = HTTP_GET, .handler = handleSpa, .user_ctx = &ctx_},
+        {.uri = "/thermostats", .method = HTTP_GET, .handler = handleSpa, .user_ctx = &ctx_},  // pre-redesign URL of /diagnostics
+        {.uri = "/diagnostics", .method = HTTP_GET, .handler = handleSpa, .user_ctx = &ctx_},
         {.uri = "/config", .method = HTTP_GET, .handler = handleSpa, .user_ctx = &ctx_},
         {.uri = "/update", .method = HTTP_GET, .handler = handleSpa, .user_ctx = &ctx_},
         {.uri = "/restart", .method = HTTP_GET, .handler = handleRestart, .user_ctx = &ctx_},
