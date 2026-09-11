@@ -58,8 +58,12 @@ jobs:
           key: pio-${{ runner.os }}-${{ hashFiles('Code/platformio.ini', 'Code/src/idf_component.yml') }}
           restore-keys: pio-${{ runner.os }}-
 
+      # Pinned on purpose - see the comment in ci.yml. PlatformIO 6.2.0 cannot
+      # link firmware.elf against the platform pinned in platformio.ini, and an
+      # unpinned release build would fail at the worst possible moment: after
+      # the tag is already pushed.
       - name: Install PlatformIO
-        run: pip install --upgrade platformio
+        run: pip install "platformio==6.1.19"
 
       - name: Stamp firmware version
         working-directory: Code

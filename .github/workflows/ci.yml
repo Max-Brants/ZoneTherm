@@ -39,8 +39,14 @@ jobs:
           key: pio-native-${{ runner.os }}-${{ hashFiles('Code/platformio.ini') }}
           restore-keys: pio-native-${{ runner.os }}-
 
+      # Pinned on purpose. PlatformIO 6.2.0 (2026-09-05) stopped shipping SCons
+      # as the tool-scons package, but the platform pinned in platformio.ini
+      # still expects SCons 4.8.1 to live there, so linking firmware.elf dies
+      # with "No module named 'SCons.Tool.FortranCommon'". A clean environment
+      # fails too, so this is not a stale-cache problem. Both jobs pin the same
+      # version to keep one place to bump. Unpin when pioarduino supports 6.2.
       - name: Install PlatformIO
-        run: pip install --upgrade platformio
+        run: pip install "platformio==6.1.19"
 
       - name: Run domain tests
         working-directory: Code
@@ -73,8 +79,14 @@ jobs:
           key: pio-${{ runner.os }}-${{ hashFiles('Code/platformio.ini', 'Code/src/idf_component.yml') }}
           restore-keys: pio-${{ runner.os }}-
 
+      # Pinned on purpose. PlatformIO 6.2.0 (2026-09-05) stopped shipping SCons
+      # as the tool-scons package, but the platform pinned in platformio.ini
+      # still expects SCons 4.8.1 to live there, so linking firmware.elf dies
+      # with "No module named 'SCons.Tool.FortranCommon'". A clean environment
+      # fails too, so this is not a stale-cache problem. Both jobs pin the same
+      # version to keep one place to bump. Unpin when pioarduino supports 6.2.
       - name: Install PlatformIO
-        run: pip install --upgrade platformio
+        run: pip install "platformio==6.1.19"
 
       - name: Build firmware
         working-directory: Code
