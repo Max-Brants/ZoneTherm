@@ -3,31 +3,34 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Restarting / ZoneTherm</title>
+  <meta name="color-scheme" content="light dark">
+  <title>Restarting - ZoneTherm</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="stylesheet" href="/style.css">
 </head>
-<body class="centered restart">
-  <a class="brand utility-brand" href="/">
-    <span class="brand-mark"><svg class="icon" viewBox="0 0 24 24"><path d="M14 14.76V3.5a2 2 0 0 0-4 0v11.26a4 4 0 1 0 4 0Z"/><line x1="12" y1="7" x2="12" y2="13"/></svg></span>
-    ZoneTherm
-  </a>
-  <main class="surface surface-compact">
-    <h1>Device Restarting</h1>
-    <div class="spinner" role="status" aria-label="Restarting"></div>
-    <p>The controller is rebooting. Redirecting to the dashboard in <strong id="countdown">10</strong> seconds.</p>
-    <p><a href="/">Open the dashboard manually</a></p>
+<body class="standalone">
+  <main>
+    <a class="brand" href="/">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="flow" x1="0" y1="9.5" x2="0" y2="22.5" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#F0673D"/><stop offset="1" stop-color="#4FA8E3"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="#1C1B19"/><path d="M10 9.5h12l-12 13h12" fill="none" stroke="url(#flow)" stroke-width="4.25" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      ZoneTherm
+    </a>
+    <h1>The controller is restarting</h1>
+    <p class="row">
+      <span class="spinner" role="status" aria-label="Restarting"></span>
+      <span>Back to the zones in <strong id="countdown">10</strong> seconds.</span>
+    </p>
+    <p><a href="/">Open the zones now</a></p>
   </main>
   <script>
-    let counter=10;
-    const countdownEl=document.getElementById("countdown");
-    const tick=()=>{
-      countdownEl.textContent=counter;
-      counter-=1;
-      if(counter<0){window.location.href="/";return;}
-      setTimeout(tick,1000);
+    let counter = 10;
+    const countdownEl = document.getElementById("countdown");
+    const tick = () => {
+      countdownEl.textContent = counter;
+      counter -= 1;
+      if (counter < 0) { window.location.href = "/"; return; }
+      setTimeout(tick, 1000);
     };
-    document.addEventListener("DOMContentLoaded",tick);
+    document.addEventListener("DOMContentLoaded", tick);
   </script>
 </body>
 </html>

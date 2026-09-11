@@ -4,4 +4,4 @@
   let { name }: { name: IconName } = $props();
 </script>
 
-<svg class="icon" viewBox="0 0 24 24">{@html icons[name]}</svg>
+<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">{@html icons[name]}</svg>

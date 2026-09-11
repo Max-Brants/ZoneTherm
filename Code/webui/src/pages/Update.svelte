@@ -3,6 +3,9 @@
   import { system } from '../lib/system';
   import { fetchJSON, post } from '../lib/api';
   import type { UpdateStatus } from '../lib/types';
+  import PageHeader from '../components/PageHeader.svelte';
+  import Pill from '../components/Pill.svelte';
+  import Segmented from '../components/Segmented.svelte';
   import Icon from '../lib/Icon.svelte';
 
   type OtaMode = 'fr' | 'fs';
@@ -11,7 +14,7 @@
     type: '' | 'error' | 'success';
   }
 
-  // ---- GitHub releases ----------------------------------------------------
+  // ---- GitHub releases ------------------------------------------------------
 
   let gh: UpdateStatus | null = $state(null);
   let ghError = $state('');
@@ -23,29 +26,46 @@
     return s?.busy === true || s?.state === 'checking' || s?.state === 'downloading';
   });
 
+  const ghLabel = $derived.by((): string => {
+    const s: UpdateStatus | null = gh;
+    if (!s) return '';
+    if (s.state === 'downloading') return 'Installing';
+    if (s.state === 'checking') return 'Checking';
+    if (s.state === 'installed') return 'Restarting';
+    if (s.state === 'failed') return 'Check failed';
+    if (s.updateAvailable) return 'Update available';
+    return s.checked ? 'Up to date' : 'Not checked yet';
+  });
+
+  const lede = $derived.by((): string => {
+    const s: UpdateStatus | null = gh;
+    const installed = s?.installedVersion || $system?.fwVersion;
+    if (!installed) return 'Reading the update status.';
+    if (s?.updateAvailable && s.latestVersion) {
+      return `Firmware ${installed} is installed. Release ${s.latestVersion} is available.`;
+    }
+    if (s?.checked && s.state !== 'failed') return `Firmware ${installed} is installed and is the latest release.`;
+    return `Firmware ${installed} is installed. The controller has not confirmed the latest release yet.`;
+  });
+
   async function refreshGh(): Promise<void> {
     try {
       gh = await fetchJSON<UpdateStatus>('/api/update');
       ghError = '';
     } catch (err) {
       console.error('Failed to load update status', err);
-      ghError = 'Could not read update status.';
+      ghError = 'Could not read the update status.';
     }
   }
 
   async function ghAction(path: string): Promise<void> {
     ghError = '';
     try {
-      const res = await post(path);
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as { error?: string } | null;
-        ghError = body?.error ?? `HTTP ${res.status}`;
-        return;
-      }
+      await post(path);
       await refreshGh();
     } catch (err) {
       console.error('Update request failed', err);
-      ghError = 'Request failed.';
+      ghError = err instanceof Error ? err.message : 'Request failed.';
     }
   }
 
@@ -69,6 +89,8 @@
     };
   });
 
+  // ---- Manual upload --------------------------------------------------------
+
   let files: FileList | null = $state(null);
   let mode: OtaMode = $state('fr');
   let status: Status | null = $state(null);
@@ -78,11 +100,6 @@
 
   // Explicit type: TS narrows `files` to its initial null in this initializer.
   const file = $derived<File | null>(files?.[0] ?? null);
-  const fileHint = $derived(
-    file
-      ? `${file.name} (${(file.size / 1048576).toFixed(2)} MB)`
-      : 'Drop or choose a firmware/filesystem .bin image'
-  );
 
   function setStatus(message: string, type: Status['type']): void {
     status = { message, type };
@@ -97,7 +114,7 @@
   function upload(event: SubmitEvent): void {
     event.preventDefault();
     if (!file) {
-      setStatus('Select a .bin file before uploading.', 'error');
+      setStatus('Choose a .bin image first.', 'error');
       return;
     }
     const selected = file;
@@ -107,7 +124,7 @@
     }
     uploading = true;
     uploadReachedEnd = false;
-    setStatus('Uploading… keep the device powered on.', '');
+    setStatus('Uploading. Keep the controller powered.', '');
     progress = 0;
 
     const xhr = new XMLHttpRequest();
@@ -139,7 +156,7 @@
       if (xhr.status === 200) {
         uploadReachedEnd = true;
         progress = 100;
-        setStatus('Upload complete. The controller will reboot shortly.', 'success');
+        setStatus('Upload complete. The controller is restarting.', 'success');
         redirectHomeSoon();
       } else {
         setStatus(`Update failed: ${xhr.responseText || 'HTTP ' + xhr.status}`, 'error');
@@ -150,133 +167,159 @@
       // The device drops the socket when it reboots right after a full upload.
       if (uploadReachedEnd) {
         progress = 100;
-        setStatus('Upload complete. The controller is rebooting; reconnect in a few seconds.', 'success');
+        setStatus('Upload complete. The controller is restarting; reconnect in a few seconds.', 'success');
         redirectHomeSoon();
         return;
       }
-      setStatus('Network error during upload. Please retry.', 'error');
+      setStatus('The upload was interrupted. Try again.', 'error');
       uploading = false;
       progress = null;
     };
   }
 </script>
 
-<main class="page page-narrow">
-  <div class="page-hero">
-    <div>
-      <span class="eyebrow">Maintenance</span>
-      <h1>Firmware Update</h1>
-    </div>
-    <div class="meta-inline">
-      <span>Device <strong>{$system?.hostname ?? '…'}</strong></span>
-      <span>Firmware <strong>{$system?.fwVersion ?? '…'}</strong></span>
-    </div>
-  </div>
-  <div class="card gh-card">
-    <div class="gh-head">
-      <h2>Automatic updates</h2>
+<main class="page narrow">
+  <PageHeader title="Update" {lede} />
+
+  <section class="panel gh">
+    <div class="panel-head">
+      <h2>Releases on GitHub</h2>
       {#if gh}
-        <span class="pill" class:on={gh.updateAvailable} class:warn={gh.state === 'failed'}>
-          {#if gh.state === 'downloading'}Installing…
-          {:else if gh.state === 'checking'}Checking…
-          {:else if gh.state === 'installed'}Rebooting…
-          {:else if gh.updateAvailable}Update available
-          {:else if gh.state === 'failed'}Check failed
-          {:else if gh.checked}Up to date
-          {:else}Not checked yet{/if}
-        </span>
+        {#if gh.state === 'failed'}
+          <Pill tone="danger">{ghLabel}</Pill>
+        {:else if gh.updateAvailable && !ghBusy}
+          <Pill tone="neutral" filled>{ghLabel}</Pill>
+        {:else}
+          <Pill>{ghLabel}</Pill>
+        {/if}
       {/if}
     </div>
 
     {#if gh?.pendingVerify}
-      <p class="status">This firmware is on trial. It is confirmed automatically once the
-        controller has held a network connection for a minute; if it cannot, the previous
-        version is restored on the next restart.</p>
+      <p class="notice">
+        This firmware is on trial. It is confirmed once the controller has held a network connection for a
+        minute; if it cannot, the previous version is restored on the next restart.
+      </p>
     {/if}
 
-    <div class="meta-inline">
-      <span>Installed <strong>{gh?.installedVersion ?? $system?.fwVersion ?? '…'}</strong></span>
-      <span>Latest <strong>{gh?.latestVersion || (gh?.checked ? '—' : 'unknown')}</strong></span>
-      <span>Mode <strong>{gh?.autoInstall ? 'Automatic' : 'Notify only'}</strong></span>
-    </div>
+    <dl class="kv">
+      <div><dt>Installed</dt><dd>{gh?.installedVersion ?? $system?.fwVersion ?? '…'}</dd></div>
+      <div><dt>Latest</dt><dd>{gh?.latestVersion || (gh?.checked ? 'unknown' : 'not checked')}</dd></div>
+      <div><dt>On a new release</dt><dd>{gh?.autoInstall ? 'Install automatically' : 'Notify only'}</dd></div>
+      <div>
+        <dt>Release notes</dt>
+        <dd>
+          {#if gh?.releaseUrl}
+            <a href={gh.releaseUrl} target="_blank" rel="noreferrer noopener">GitHub<Icon name="external" /></a>
+          {:else}
+            <span class="faint">none yet</span>
+          {/if}
+        </dd>
+      </div>
+    </dl>
 
     {#if gh && gh.progress >= 0}
-      <div class="progress"><span style="width:{gh.progress}%"></span></div>
+      <div class="progress" role="progressbar" aria-valuenow={gh.progress} aria-valuemin="0" aria-valuemax="100">
+        <span style="width:{gh.progress}%"></span>
+      </div>
     {/if}
 
     {#if ghError}
-      <p class="status error">{ghError}</p>
+      <p class="notice danger">{ghError}</p>
     {:else if gh?.message}
-      <p class="status" class:error={gh.state === 'failed'} class:success={gh.state === 'installed'}>{gh.message}</p>
+      <p class="notice" class:danger={gh.state === 'failed'}>{gh.message}</p>
     {/if}
 
-    <div class="gh-actions">
+    <div class="actions">
       <button type="button" class="btn" disabled={ghBusy} onclick={() => ghAction('/api/update/check')}>
-        <Icon name="refresh" /> Check now
+        <Icon name="refresh" />Check now
       </button>
       <button
         type="button"
         class="btn btn-primary"
         disabled={ghBusy || !gh?.updateAvailable}
         onclick={() => ghAction('/api/update/install')}>
-        <Icon name="download" /> Install {gh?.latestVersion ?? ''}
+        <Icon name="download" />Install {gh?.latestVersion ?? ''}
       </button>
-      {#if gh?.releaseUrl}
-        <a class="gh-link" href={gh.releaseUrl} target="_blank" rel="noreferrer noopener">Release notes</a>
-      {/if}
     </div>
-    <p class="hint">Releases are pulled from GitHub over HTTPS. Repository, schedule and
-      automatic installation are set on the <a href="/config">Config</a> page.</p>
-  </div>
+    <p class="hint">
+      Repository, schedule and automatic installation are set under <a href="/config">Settings</a>.
+    </p>
+  </section>
 
-  <div class="card update-card">
-    <h2>Manual upload</h2>
-    <label class="dropzone">
-      <input type="file" accept=".bin" bind:files onchange={() => { status = null; progress = null; }}>
-      <Icon name="upload" />
-      <span>{fileHint}</span>
-    </label>
-    <div class="meta-inline">
-      <span>IP <strong>{$system?.ip ?? '…'}</strong></span>
-      <span>MAC <strong>{$system?.mac ?? '…'}</strong></span>
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Manual upload</h2>
     </div>
     <form onsubmit={upload}>
-      <fieldset>
-        <legend>Update target</legend>
-        <div class="modes">
-          <label class="chip" class:selected={mode === 'fr'}>
-            <input type="radio" name="mode" value="fr" bind:group={mode}>
-            <Icon name="download" />
-            Firmware
-          </label>
-          <label class="chip" class:selected={mode === 'fs'}>
-            <input type="radio" name="mode" value="fs" bind:group={mode}>
-            <Icon name="folder" />
-            Filesystem
-          </label>
-        </div>
-      </fieldset>
+      <label class="dropzone" class:has-file={!!file}>
+        <input
+          type="file"
+          accept=".bin"
+          bind:files
+          onchange={() => {
+            status = null;
+            progress = null;
+          }} />
+        <Icon name="upload" />
+        {#if file}
+          <span class="file-name">{file.name}</span>
+          <span class="faint">{(file.size / 1048576).toFixed(2)} MB</span>
+        {:else}
+          <span>Drop a .bin image here, or choose one</span>
+          <span class="faint">firmware.bin or littlefs.bin from a release</span>
+        {/if}
+      </label>
+
+      <div class="target">
+        <span class="target-label">Flash as</span>
+        <Segmented
+          label="Update target"
+          value={mode}
+          disabled={uploading}
+          options={[
+            { value: 'fr', label: 'Firmware', icon: 'chip' },
+            { value: 'fs', label: 'Web interface', icon: 'folder' },
+          ]}
+          onchange={(v) => (mode = v)} />
+      </div>
+
       {#if progress !== null}
-        <div class="progress"><span style="width:{progress}%"></span></div>
+        <div class="progress" role="progressbar" aria-valuenow={progress} aria-valuemin="0" aria-valuemax="100">
+          <span style="width:{progress}%"></span>
+        </div>
       {/if}
       {#if status}
-        <p class="status" class:error={status.type === 'error'} class:success={status.type === 'success'}>{status.message}</p>
+        <p class="notice" class:danger={status.type === 'error'}>{status.message}</p>
       {/if}
-      <button type="submit" class="btn btn-primary" disabled={!file || uploading}>Upload and Flash</button>
+
+      <div class="actions">
+        <button type="submit" class="btn btn-primary" disabled={!file || uploading}>Upload and flash</button>
+      </div>
     </form>
-  </div>
-  <footer>© {new Date().getFullYear()} ZoneTherm · Device reboots after a successful upload.</footer>
+  </section>
 </main>
 
 <style>
-  form{display:grid;gap:18px}
-  .gh-card{display:grid;gap:14px;margin-bottom:1.25rem}
-  .gh-card h2,.update-card h2{margin:0;font-size:1.05rem}
-  .gh-head{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
-  .pill{padding:.2rem .6rem;border-radius:999px;font-size:.8rem;border:1px solid rgba(128,128,128,.4);opacity:.85}
-  .pill.on{border-color:var(--success);color:var(--success);opacity:1}
-  .pill.warn{border-color:var(--danger);color:var(--danger);opacity:1}
-  .gh-actions{display:flex;gap:.75rem;align-items:center;flex-wrap:wrap}
-  .gh-link{font-size:.85rem;opacity:.8}
-  .hint{font-size:.85rem;opacity:.75;margin:0}
+  .narrow{max-width:720px;}
+  .panel{display:grid;gap:16px;}
+  .panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+  .kv{grid-template-columns:1fr;}
+  .kv a{display:inline-flex;align-items:center;gap:4px;}
+  .kv a :global(.icon){width:13px;height:13px;}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;}
+  .hint{font-size:.8125rem;color:var(--text-3);}
+  form{display:grid;gap:16px;}
+  .dropzone{
+    position:relative;display:grid;justify-items:center;gap:4px;padding:28px 20px;text-align:center;
+    border:1px dashed var(--line-strong);border-radius:var(--r-md);background:var(--surface-2);
+    color:var(--text-2);cursor:pointer;transition:border-color .12s,background-color .12s;
+  }
+  .dropzone:hover,.dropzone:focus-within{border-color:var(--text);color:var(--text);}
+  .dropzone.has-file{border-style:solid;}
+  .dropzone input{position:absolute;inset:0;opacity:0;cursor:pointer;}
+  .dropzone :global(.icon){width:22px;height:22px;margin-bottom:6px;}
+  .file-name{font-weight:500;color:var(--text);word-break:break-all;}
+  .target{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+  .target-label{font-size:.8125rem;color:var(--text-2);}
 </style>

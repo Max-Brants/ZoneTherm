@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="376" height="64" viewBox="0 0 188 32">
+  <!-- ZoneTherm horizontal lockup, for light backgrounds. Wordmark: a humanist
+       grotesque (Inter, falling back to the system UI face), semibold, tracked
+       -0.02em, cap height aligned to the tile's Z. -->
+  <defs>
+    <linearGradient id="flow" x1="0" y1="9.5" x2="0" y2="22.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F0673D"/>
+      <stop offset="1" stop-color="#4FA8E3"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="8" fill="#1C1B19"/>
+  <path d="M10 9.5h12l-12 13h12" fill="none" stroke="url(#flow)" stroke-width="4.25" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="43" y="22.4" fill="#1C1B19" font-family="Inter, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-size="19" font-weight="600" letter-spacing="-0.4">ZoneTherm</text>
+</svg>

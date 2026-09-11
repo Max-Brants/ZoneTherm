@@ -1,6 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- The ZoneTherm mark: a Z drawn as one stroke, warm at the supply end and
-       cool at the return. Mirrors src/components/Brand.svelte and brand/. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 32 32">
+  <!-- ZoneTherm mark. A Z drawn as one stroke: warm (ember) at the supply end,
+       cool (glacier) at the return - the two seasons the plant runs in.
+       Tile: ink 1C1B19, corner radius 25% of the side. -->
   <defs>
     <linearGradient id="flow" x1="0" y1="9.5" x2="0" y2="22.5" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#F0673D"/>

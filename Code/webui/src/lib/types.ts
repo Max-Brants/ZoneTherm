@@ -20,9 +20,9 @@ export interface SystemInfo {
 export interface Thermostat {
   id: number;
   name: string;
-  status: string;
+  status: 'Active' | 'Inactive' | string; // Active while the thermostat keeps polling
   action: ThermostatAction;
-  currentTemp: number;
+  currentTemp: number; // 0 = the thermostat has not reported a room temperature yet
   setpoint: number;
   enabled: boolean;
   valves: number[]; // the valves this thermostat drives; empty = drives nothing
@@ -30,6 +30,7 @@ export interface Thermostat {
   totalRequests: number;
   failedRequests: number;
   errorCode?: number;
+  modulation?: number;
 }
 
 export interface ThermostatsResponse {
@@ -51,14 +52,14 @@ export interface AppConfig {
   net: {
     hostname: string;
     wifiSsid: string;
-    wifiPass: string;
+    wifiPass: string; // masked as "•••" when set
   };
   mqtt: {
     enabled: boolean;
     host: string;
     port: number;
     user: string;
-    pass: string;
+    pass: string; // masked as "•••" when set
     baseTopic: string;
     discoveryPrefix: string;
   };
